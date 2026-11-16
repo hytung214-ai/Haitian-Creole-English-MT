@@ -1,0 +1,4 @@
+condition,input_pairs,kept_pairs,removed_pairs,removed_percent,output_src,output_tgt
+full,532027,532027,0,0.00,data/full/train.hat,data/full/train.eng
+light_clean,532027,466288,65739,12.36,data/light_clean/train.hat,data/light_clean/train.eng
+risk_clean,532027,278879,253148,47.58,data/risk_clean/train.hat,data/risk_clean/train.eng

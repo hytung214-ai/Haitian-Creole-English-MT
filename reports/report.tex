@@ -1,0 +1,141 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[numbers]{natbib}
+
+\title{Data Quality in Haitian Creole--English Machine Translation}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+In machine translation, training data is not simply a case of ``more is always better.'' Web-crawled or automatically aligned corpora can contain misaligned sentence pairs, wrong-language text, untranslated fragments, short or over-long segments, and web navigation text. Previous work shows that this matters for NMT: Khayrallah and Koehn~\cite{khayrallah-koehn-2018-noise} find that NMT is sensitive to noisy parallel data, while Bane and Zaretskaya~\cite{bane-zaretskaya-2021-filtering} and Bane et al.~\cite{bane-etal-2022-filtering} show that filtering can help but does not automatically beat using the full dataset, because data size and diversity also affect performance.
+
+Our project uses Haitian Creole as a case study to ask whether data quality or data quantity matters more for an NMT system. Haitian Creole is a French-lexifier creole used in Haiti. Although much of its vocabulary comes from French, it should not be treated as simplified French. It has its own grammar, spelling conventions, and social context. This matters for MT because surface similarity to French is not enough for a model to reliably infer meaning.
+
+For this language pair, the training data is useful but also visibly noisy. The corpus contains many web-style sentences, product descriptions, short fragments, identical source-target pairs, markup leftovers, and examples that may be weakly aligned. This makes Haitian Creole to English a good setting for our main question: whether it is better to train on all available data, including noise, or to train on a smaller dataset after cleaning.
+
+\section{Data}
+
+Our data comes from the Kreyol-MT corpus, a collection of Haitian Creole--English parallel sentences compiled from diverse web sources. The original release provides 665,033 training pairs and a separate test set of 1,228 pairs. The training data covers a wide range of domains and registers, including religious texts, product listings, web navigation strings, news fragments, technical specifications, and user-generated content. This heterogeneity is both a strength and a challenge: it offers broad lexical coverage, but it also means that the training data contains substantial noise, such as untranslated segments, HTML markup, misaligned sentence pairs, and short fragments that carry little translational value.
+
+Since the original release does not include a development set, we split the 665,033 training pairs into three subsets using an 80/10/10 ratio: a training set of 532,027 pairs, a development set of 66,503 pairs for tuning and early stopping, and an internal test set of 66,503 pairs for intermediate evaluation during development. The official test set of 1,228 pairs was kept entirely separate and used only for final evaluation.
+
+\section{Methods}
+
+\subsection{Data Cleaning}
+
+We compared five training conditions. \texttt{full} keeps the original training split without extra cleaning and serves as the 532,027-pair baseline. \texttt{light\_clean} removes obvious noise such as duplicates, identical source--target pairs, markup, URLs, encoding problems, extreme length ratios, very long fragments, and punctuation- or number-only pairs, leaving 466,288 pairs. \texttt{risk\_clean} adds more aggressive filters for web/product-like fragments, title-like short fragments, short noisy fragments, and suspicious alignments, leaving 278,879 pairs. To separate cleaning effects from data-size effects, we also created \texttt{light\_control} and \texttt{risk\_control}, random subsets of \texttt{full} with the same sizes as the corresponding cleaned sets.
+
+\subsection{Experiment Setup}
+
+All systems use the same fairseq Transformer setup for Haitian Creole to English, with the \texttt{transformer\_iwslt\_de\_en} architecture, shared 8,000-token SentencePiece BPE vocabulary, shared embeddings, Adam optimisation, inverse-square-root scheduling, dropout \texttt{0.2}, and beam search with beam size 5. Each run uses the same maximum budget of 200,000 updates and patience-based stopping with patience 25; the development set is used for validation, early stopping, and checkpoint selection.
+
+\subsection{Evaluation}
+
+After training, we decode the best checkpoint on both the internal test set and the official held-out test set. We include an internal test set because the official test set has only 1,228 sentence pairs, which is very small compared with the original 665,033 training pairs. The internal test set gives us a larger reference point for comparison, and the official test set remains the final held-out evaluation set. We use BLEU computed with sacreBLEU as the main metric and chrF2 as a supporting character-level metric. For significance testing, we use paired bootstrap resampling on both BLEU and chrF2.
+
+\section{Results and Analysis}
+
+This section reports the main experimental results and two robustness checks. We focus on describing what happened; higher-level interpretation is deferred to the Discussion.
+
+\subsection{Automatic Evaluation Results}
+
+Table~\ref{tab:main-results} presents the sacreBLEU and chrF2 scores for the full baseline and the paired clean/control conditions on both the internal and official test sets. All scores come from the final converged runs, where each model was trained until validation loss plateaued.
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Condition} & \textbf{Int.\ BLEU} & \textbf{Int.\ chrF2} & \textbf{Off.\ BLEU} & \textbf{Off.\ chrF2} & \textbf{Updates} \\
+\midrule
+\texttt{full} & 60.5 & 75.1 & 43.0 & 64.8 & 200,000 \\
+\texttt{light} clean/control & 58.5/\textbf{59.8} & 73.9/\textbf{74.7} & 41.9/\textbf{42.4} & 63.9/\textbf{64.4} & 113,511/160,000 \\
+\texttt{risk} clean/control & 55.3/\textbf{56.9} & 71.9/\textbf{73.0} & \textbf{41.6}/40.0 & \textbf{63.5}/62.5 & 63,738/77,000 \\
+\bottomrule
+\end{tabular}
+\caption{Automatic evaluation results for the converged runs. In paired rows, values are shown as clean/control, and bold marks the higher score within that pair. Int.\ = internal test set; Off.\ = official test set.}
+\label{tab:main-results}
+\end{table}
+
+The \texttt{full} model achieves the highest scores on both test sets, reaching 43.0 BLEU and 64.8 chrF2 on the official test. Neither cleaning strategy improves over the full-data baseline: \texttt{light\_clean} scores 41.9 BLEU and \texttt{risk\_clean} scores 41.6 BLEU on the official test, both below \texttt{full}. The more aggressive \texttt{risk\_clean} filtering, which removes nearly half the training data, does not yield better translations than the milder \texttt{light\_clean} filtering.
+
+An informative comparison is between each cleaned condition and its size-matched random control. On the official test, \texttt{light\_clean} (41.9) scores below \texttt{light\_control} (42.4), meaning that light cleaning actually performs worse than a random subset of the same size. For the risk-aware pair, \texttt{risk\_clean} (41.6) does outperform \texttt{risk\_control} (40.0) by 1.6 BLEU, suggesting that the risk-aware filtering rules do select somewhat better data than random sampling when a large fraction of the corpus is removed. However, neither cleaned condition surpasses the full-data model.
+
+The gap between internal and official scores is substantial across all conditions, with internal BLEU scores roughly 15--17 points higher than official scores. This is partly expected because the internal test was drawn from the same distribution as the training data, whereas the official test was constructed independently.
+
+\subsection{Significance Testing}
+
+Paired bootstrap resampling on the official test set using sacreBLEU~2.6.0 with 10,000 resamples showed that \texttt{full} significantly outperformed all other systems on both BLEU and chrF2 at $p < 0.05$. The smallest gap was against \texttt{light\_control} ($-0.64$ BLEU, $p = 0.037$), so that comparison should be interpreted as small but still statistically significant.
+
+\subsection{Robustness Check~1: Cleaned Official Test Evaluation}
+\label{sec:cleaned-test}
+
+One possible explanation for the cleaned models' lower scores is that the official test set itself contains noisy examples that happen to favour the \texttt{full} model. If the official test includes sentences that the cleaning rules would have removed, the cleaned models might be unfairly penalised for not having seen similar noisy patterns during training. To test this, we applied the corresponding cleaning rules to the official test set and re-evaluated each cleaned model on its filtered subset.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{llrrrr}
+\toprule
+\textbf{Model} & \textbf{Cleaned test set} & \textbf{Pairs} & \textbf{BLEU} & \textbf{chrF2} & \textbf{$\Delta$BLEU} \\
+\midrule
+light\_clean & light-filtered official test & 1,220 & 41.5 & 63.8 & $-0.4$ \\
+risk\_clean  & risk-filtered official test  & 1,012 & 41.0 & 63.3 & $-0.6$ \\
+\bottomrule
+\end{tabular}
+\caption{Cleaned-data models evaluated on correspondingly filtered official test subsets. $\Delta$BLEU is the change relative to each model's score on the original 1,228-pair official test.}
+\label{tab:cleaned-test}
+\end{table}
+
+As Table~\ref{tab:cleaned-test} shows, applying the cleaning filters to the official test set does not help the cleaned models. Both \texttt{light\_clean} and \texttt{risk\_clean} score slightly lower on their filtered test subsets than on the original official test. The light-cleaning filter removes only 8 of the 1,228 test pairs, while the risk-aware filter removes 216. In neither case does evaluating on a ``cleaner'' test set close the gap with the \texttt{full} model. This suggests that the cleaned models' lower performance is not an artefact of noisy test examples penalising them; rather, the cleaning process appears to have removed training data that provided useful coverage.
+
+\subsection{Robustness Check~2: Train / Official Test Overlap}
+\label{sec:overlap}
+
+A second concern is whether the \texttt{full} model's higher official-test score might be inflated by training examples that are duplicated in the test set. If the official test contains many sentences also present in the full training data, the \texttt{full} model could achieve higher BLEU simply by memorising those examples. To investigate this, we checked for exact and normalised overlap between the full training set and the official test set. Normalisation included lowercasing, HTML entity unescaping, whitespace collapsing, and edge trimming.
+
+Official train--test overlap was low: only 13 normalised parallel-pair overlaps, or 1.06\% of the official test set. Removing these examples left \texttt{full} unchanged at 43.0 BLEU and 64.8 chrF2, so the full model's advantage is not mainly explained by train--test contamination.
+
+\section{Discussion}
+
+The results show that data cleaning did not improve translation quality for this Haitian Creole--English task. Although the original training data contained noise, the full-data system still performed best, suggesting that vocabulary and domain coverage mattered more than surface cleanliness. Noisy-looking examples were not always useless: short fragments, names, numbers, product text, web-domain phrases, and technical expressions could still provide useful translation evidence. The lower scores of both cleaned systems suggest that the filters removed useful sentence pairs along with genuine noise.
+
+The robustness checks and manual error analysis support this interpretation. The cleaned systems did not improve on cleaned official-test subsets, and the train/test overlap check showed that the full system's advantage was not driven by memorising repeated examples. In the manual analysis, the cleaned systems showed no clear advantage, and the most common error type was meaning shift. Taken together, the results do not support our hypotheses: light cleaning did not help, risk-aware cleaning hurt, and coverage mattered more than cleanliness for this dataset.
+
+\section{Limitations and Future Work}
+
+This project has several limitations. First, our cleaning rules were surface-based heuristics, identical source--target pairs, over-long segments, length-ratio anomalies, web and product-like text, and short fragments, rather than gold-standard noise labels; because we did not manually annotate the full training set, we also cannot say precisely how many removed pairs were genuinely noisy. Second, our manual error analysis was limited: we are not fluent in Haitian Creole, so it focused on the English output, reference, visible copying, names, numbers, and clear meaning differences, may have missed source-side errors, and covered only 150 examples. Third, BLEU and chrF2 measure n-gram overlap with the references and can miss problems in meaning and fluency. Fourth, the official test set is small (1,228 examples), so the results may depend on this dataset, model setup, BPE setting, and cleaning rules, and should not be treated as general claims about low-resource MT.
+
+Future work could address these gaps by deriving cleaning rules from manually annotated noise labels, running a larger error analysis with Haitian Creole speakers, testing softer strategies that down-weight suspicious pairs instead of deleting them, and complementing BLEU and chrF2 with human or meaning-oriented evaluation.
+
+\section{Conclusion}
+
+This project asked whether a smaller but cleaner training set can outperform a larger noisy one for Haitian Creole--English machine translation. The answer is no: the full-data system achieved the highest BLEU and chrF2 on the official test set, significantly outperforming every cleaned system, while the cleaned-test and train/test-overlap checks ruled out the main alternative explanations. The most likely reason is coverage. Although the full data contained noise, it also preserved useful vocabulary, names, short expressions, and product- and web-domain text that the cleaning rules discarded; for this low-resource MT setting, more data was worth more than cleaner-looking data.
+
+\begin{thebibliography}{9}
+
+\bibitem{khayrallah-koehn-2018-noise}
+Huda Khayrallah and Philipp Koehn.
+\newblock On the impact of various types of noise on neural machine translation.
+\newblock In \emph{Proceedings of the 2nd Workshop on Neural Machine Translation and Generation}, 2018.
+
+\bibitem{bane-zaretskaya-2021-filtering}
+Fred Bane and Anna Zaretskaya.
+\newblock Selecting the best data filtering method for NMT training.
+\newblock In \emph{Proceedings of Machine Translation Summit XVIII: Users and Providers Track}, 2021.
+
+\bibitem{bane-etal-2022-filtering}
+Fred Bane, Clara Soler Uguet, Wiktor Stribizew, and Anna Zaretskaya.
+\newblock A comparison of data filtering methods for neural machine translation.
+\newblock In \emph{Proceedings of the 15th Biennial Conference of the Association for Machine Translation in the Americas}, 2022.
+
+\end{thebibliography}
+
+\end{document}

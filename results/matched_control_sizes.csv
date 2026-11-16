@@ -1,0 +1,3 @@
+condition,control_type,matched_to_size,input_pairs,kept_pairs,removed_pairs,removed_percent,seed,output_src,output_tgt
+light_control,random_subset_of_full,466288,532027,466288,65739,12.36,1135,data/light_control/train.hat,data/light_control/train.eng
+risk_control,random_subset_of_full,278879,532027,278879,253148,47.58,1136,data/risk_control/train.hat,data/risk_control/train.eng

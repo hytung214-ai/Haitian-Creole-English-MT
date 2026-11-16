@@ -1,0 +1,30 @@
+{
+  "train_pairs": 532027,
+  "test_pairs": 66503,
+  "matches": {
+    "exact_pair": {
+      "test_lines_matched": 0,
+      "train_occurrences": 0
+    },
+    "normalized_pair": {
+      "test_lines_matched": 5003,
+      "train_occurrences": 5219
+    },
+    "exact_source": {
+      "test_lines_matched": 10234,
+      "train_occurrences": 100695
+    },
+    "normalized_source": {
+      "test_lines_matched": 14109,
+      "train_occurrences": 119013
+    },
+    "exact_target": {
+      "test_lines_matched": 7319,
+      "train_occurrences": 69743
+    },
+    "normalized_target": {
+      "test_lines_matched": 11547,
+      "train_occurrences": 82570
+    }
+  }
+}

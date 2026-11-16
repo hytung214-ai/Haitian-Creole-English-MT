@@ -1,0 +1,21 @@
+# Downloaded corpus and generated experiments
+/data/
+/Kreyol-MT-main/
+/experiments/
+/checkpoints/
+*.pt
+*.pth
+*.bin
+*.idx
+*.model
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+*.log
+*.aux
+*.out
+*.synctex.gz
+.DS_Store
